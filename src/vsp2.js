@@ -28,31 +28,23 @@
  */
 
 const config = {
-    'vsp.port': '1',
-    'vsp.speed': '0.0',
-    'vsp.drive': 'no',
-    'vsp.reverse': 'no',
+    port: '1',
+    speed: '0.0',
+    drive: 'no',
+    reverse: 'no',
 };
 
 const state = {
     on: 0,
     speedSubscription: false,
-    driveSubscription: false,
+    forwardSubscription: false,
     reverseSubscription: false,
     neutralSubscription: false,
 };
 
 const loadConfig = function () {
-    OvmsCommand.Exec('config list vehicle')
-        .split('\n')
-        .forEach(function (line) {
-            if (line.indexOf('vsp') >= 0) {
-                const cols = line.substr(2).split(': ');
-                config[cols[0]] = cols[1];
-            }
-        });
-
-    config['vsp.speed'] = parseFloat(config['vsp.speed']);
+    Object.assign(config, OvmsConfig.GetValues('vehicle', 'vsp.'));
+    config.speed = parseFloat(config.speed);
     exports.info();
 };
 
@@ -60,17 +52,17 @@ const setup = function () {
     print('setup\n');
     loadConfig();
 
-    subscribe('driveSubscription', 'vehicle.gear.forward', function () {
+    subscribe('forwardSubscription', 'vehicle.gear.forward', function () {
         print('Drive engaged\n');
-        exports.set(config['vsp.drive'] === 'yes');
-        if (config['vsp.speed']) {
+        exports.set(config.drive === 'yes');
+        if (config.speed) {
             subscribe('speedSubscription', 'ticker.1', function () {
                 const speed = OvmsMetrics.AsFloat('v.p.speed');
                 print('vsp - speed [' + speed + ']\n');
-                if (config['vsp.drive'] === 'yes') {
-                    exports.set(speed < config['vsp.speed']);
+                if (config.drive === 'yes') {
+                    exports.set(speed < config.speed);
                 } else {
-                    exports.set(speed > 0.0 && speed <= config['vsp.speed']);
+                    exports.set(speed > 0.0 && speed <= config.speed);
                 }
             });
         }
@@ -79,7 +71,7 @@ const setup = function () {
     subscribe('reverseSubscription', 'vehicle.gear.reverse', function () {
         print('Reverse engaged\n');
         unsubscribe('speedSubscription');
-        exports.set(config['vsp.reverse'] === 'yes');
+        exports.set(config.reverse === 'yes');
     });
 
     subscribe('neutralSubscription', 'vehicle.gear.neutral', function () {
@@ -93,7 +85,7 @@ const tearDown = function () {
     print('tearDown');
     exports.set(0);
     unsubscribe('speedSubscription');
-    unsubscribe('driveSubscription');
+    unsubscribe('forwardSubscription');
     unsubscribe('reverseSubscription');
     unsubscribe('neutralSubscription');
 };
@@ -125,16 +117,16 @@ exports.set = function (onoff) {
             ']\n'
     );
 
-    if (onoff !== state.on) {
-        OvmsCommand.Exec('egpio output ' + config['vsp.port'] + ' ' + newState);
+    if (newState !== state.on) {
+        OvmsCommand.Exec('egpio output ' + config.port + ' ' + newState);
         OvmsCommand.Exec('event raise usr.vsp.' + (newState ? 'on' : 'off'));
         state.on = newState;
-        print('vsp state - changed\n');
+        print('vsp state - changed to [' + newState + ']\n');
     }
 };
 
 exports.info = function () {
-    JSON.print({ config: config, state: state });
+    JSON.print({ config, state });
 };
 
 PubSub.subscribe('config.changed', loadConfig);

@@ -28,10 +28,10 @@
  */
 
 const config = {
-    'vsp.port': '1',
-    'vsp.speed': '0.0',
-    'vsp.drive': 'no',
-    'vsp.reverse': 'no',
+    port: '1',
+    speed: '0.0',
+    drive: 'no',
+    reverse: 'no',
 };
 
 const state = {
@@ -40,16 +40,8 @@ const state = {
 };
 
 const loadConfig = function () {
-    OvmsCommand.Exec('config list vehicle')
-        .split('\n')
-        .forEach(function (line) {
-            if (line.indexOf('vsp') >= 0) {
-                const cols = line.substr(2).split(': ');
-                config[cols[0]] = cols[1];
-            }
-        });
-
-    config['vsp.speed'] = parseFloat(config['vsp.speed']);
+    Object.assign(config, OvmsConfig.GetValues('vehicle', 'vsp.'));
+    config.speed = parseFloat(config.speed);
     exports.info();
 };
 
@@ -78,18 +70,18 @@ const onTicker = function () {
     print('vsp - gear [' + gear + '] speed [' + speed + ']\n');
     if (gear > 0) {
         // We're going forward (or are about to).
-        if (config['vsp.drive'] === 'yes') {
-            if (config['vsp.speed']) {
-                exports.set(speed < config['vsp.speed']);
+        if (config.drive === 'yes') {
+            if (config.speed) {
+                exports.set(speed < config.speed);
             } else {
                 exports.set(1);
             }
         } else {
-            exports.set(speed > 0.0 && speed <= config['vsp.speed']);
+            exports.set(speed > 0.0 && speed <= config.speed);
         }
     } else if (gear < 0) {
         // We're in reverse
-        exports.set(config['vsp.reverse'] === 'yes');
+        exports.set(config.reverse === 'yes');
     } else {
         // Neutral and maybe park. For now we just turn off.
         exports.set(0);
@@ -107,8 +99,8 @@ exports.set = function (onoff) {
             state.on +
             ']\n'
     );
-    if (onoff !== state.on) {
-        OvmsCommand.Exec('egpio output ' + config['vsp.port'] + ' ' + newState);
+    if (newState !== state.on) {
+        OvmsCommand.Exec('egpio output ' + config.port + ' ' + newState);
         OvmsCommand.Exec('event raise usr.vsp.' + (newState ? 'on' : 'off'));
         state.on = newState;
         print('vsp state - changed\n');
@@ -116,7 +108,7 @@ exports.set = function (onoff) {
 };
 
 exports.info = function () {
-    JSON.print({ config: config, state: state });
+    JSON.print({ config, state });
 };
 
 PubSub.subscribe('config.changed', loadConfig);
