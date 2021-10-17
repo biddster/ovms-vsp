@@ -36,7 +36,10 @@ const config = {
 
 const state = {
     on: 0,
-    tickerSubscription: false,
+    speedSubscription: false,
+    driveSubscription: false,
+    reverseSubscription: false,
+    neutralSubscription: false,
 };
 
 const loadConfig = function () {
@@ -56,43 +59,57 @@ const loadConfig = function () {
 const setup = function () {
     print('setup\n');
     loadConfig();
-    if (!state.tickerSubscription) {
-        state.tickerSubscription = PubSub.subscribe('ticker.1', onTicker);
-        print('Ticker subscribed\n');
-    }
+
+    subscribe('driveSubscription', 'vehicle.gear.forward', function () {
+        print('Drive engaged\n');
+        exports.set(config['vsp.drive'] === 'yes');
+        if (config['vsp.speed']) {
+            subscribe('speedSubscription', 'ticker.1', function () {
+                const speed = OvmsMetrics.AsFloat('v.p.speed');
+                print('vsp - speed [' + speed + ']\n');
+                if (config['vsp.drive'] === 'yes') {
+                    exports.set(speed < config['vsp.speed']);
+                } else {
+                    exports.set(speed > 0.0 && speed <= config['vsp.speed']);
+                }
+            });
+        }
+    });
+
+    subscribe('reverseSubscription', 'vehicle.gear.reverse', function () {
+        print('Reverse engaged\n');
+        unsubscribe('speedSubscription');
+        exports.set(config['vsp.reverse'] === 'yes');
+    });
+
+    subscribe('neutralSubscription', 'vehicle.gear.neutral', function () {
+        print('Neutral engaged\n');
+        unsubscribe('speedSubscription');
+        exports.set(0);
+    });
 };
 
 const tearDown = function () {
     print('tearDown');
     exports.set(0);
-    if (state.tickerSubscription) {
-        PubSub.unsubscribe(state.tickerSubscription);
-        state.tickerSubscription = false;
-        print('Ticker unsubscribed\n');
+    unsubscribe('speedSubscription');
+    unsubscribe('driveSubscription');
+    unsubscribe('reverseSubscription');
+    unsubscribe('neutralSubscription');
+};
+
+const subscribe = function (stateProperty, event, func) {
+    if (!state[stateProperty]) {
+        state[stateProperty] = PubSub.subscribe(event, func);
+        print('Subscribed [' + stateProperty + '] [' + event + ']\n');
     }
 };
 
-const onTicker = function () {
-    const gear = OvmsMetrics.AsFloat('v.e.gear');
-    const speed = OvmsMetrics.AsFloat('v.p.speed');
-    print('vsp - gear [' + gear + '] speed [' + speed + ']\n');
-    if (gear > 0) {
-        // We're going forward (or are about to).
-        if (config['vsp.drive'] === 'yes') {
-            if (config['vsp.speed']) {
-                exports.set(speed < config['vsp.speed']);
-            } else {
-                exports.set(1);
-            }
-        } else {
-            exports.set(speed > 0.0 && speed <= config['vsp.speed']);
-        }
-    } else if (gear < 0) {
-        // We're in reverse
-        exports.set(config['vsp.reverse'] === 'yes');
-    } else {
-        // Neutral and maybe park. For now we just turn off.
-        exports.set(0);
+const unsubscribe = function (stateProperty) {
+    if (state[stateProperty]) {
+        PubSub.unsubscribe(state[stateProperty]);
+        state[stateProperty] = false;
+        print('Unsubscribed [' + stateProperty + ']\n');
     }
 };
 
@@ -107,6 +124,7 @@ exports.set = function (onoff) {
             state.on +
             ']\n'
     );
+
     if (onoff !== state.on) {
         OvmsCommand.Exec('egpio output ' + config['vsp.port'] + ' ' + newState);
         OvmsCommand.Exec('event raise usr.vsp.' + (newState ? 'on' : 'off'));
