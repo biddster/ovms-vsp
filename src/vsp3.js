@@ -45,19 +45,21 @@ const loadConfig = function () {
     exports.info();
 };
 
-const onDrive = function () {
-    print('Drive engaged\n');
+const onForward = function () {
+    print('Forward/Drive engaged\n');
     exports.set(config.drive === 'yes');
     if (config.speed) {
-        subscribe('speedSubscription', 'ticker.1', function () {
-            const speed = OvmsMetrics.AsFloat('v.p.speed');
-            print('vsp - speed [' + speed + ']\n');
-            if (config.drive === 'yes') {
-                exports.set(speed < config.speed);
-            } else {
-                exports.set(speed > 0.0 && speed <= config.speed);
-            }
-        });
+        config.speedSubscription = PubSub.subscribe('ticker.1', speedHandler);
+    }
+};
+
+const speedHandler = function () {
+    const speed = OvmsMetrics.AsFloat('v.p.speed');
+    print('vsp - speed [' + speed + ']\n');
+    if (config.drive === 'yes') {
+        exports.set(speed < config.speed);
+    } else {
+        exports.set(speed > 0.0 && speed <= config.speed);
     }
 };
 
@@ -69,27 +71,18 @@ const onNeutral = function () {
 const onReverse = function () {
     print('Reverse engaged\n');
     exports.set(config.reverse === 'yes');
-    unsubscribe('speedSubscription');
+    if (state.speedSubscription) {
+        PubSub.unsubscribe(state.speedSubscription);
+        state.speedSubscription = false;
+    }
 };
 
 const turnOff = function () {
     print('Turning off\n');
     exports.set(0);
-    unsubscribe('speedSubscription');
-};
-
-const subscribe = function (stateProperty, event, func) {
-    if (!state[stateProperty]) {
-        state[stateProperty] = PubSub.subscribe(event, func);
-        print('Subscribed [' + stateProperty + '] [' + event + ']\n');
-    }
-};
-
-const unsubscribe = function (stateProperty) {
-    if (state[stateProperty]) {
-        PubSub.unsubscribe(state[stateProperty]);
-        state[stateProperty] = false;
-        print('Unsubscribed [' + stateProperty + ']\n');
+    if (state.speedSubscription) {
+        PubSub.unsubscribe(state.speedSubscription);
+        state.speedSubscription = false;
     }
 };
 
@@ -118,7 +111,7 @@ exports.info = function () {
 };
 
 PubSub.subscribe('config.changed', loadConfig);
-PubSub.subscribe('vehicle.gear.forward', onDrive);
+PubSub.subscribe('vehicle.gear.forward', onForward);
 PubSub.subscribe('vehicle.gear.neutral', onNeutral);
 PubSub.subscribe('vehicle.gear.reverse', onReverse);
 PubSub.subscribe('vehicle.off', turnOff);
