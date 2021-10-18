@@ -89,7 +89,7 @@ const onTicker = function () {
 };
 
 exports.set = function (onoff) {
-    const newState = !!onoff ? 1 : 0;
+    const newState = onoff ? 1 : 0;
     print(
         'vsp state - requested [' +
             onoff +
