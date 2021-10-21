@@ -32,6 +32,24 @@ const config = {
     speed: '0.0',
     drive: 'no',
     reverse: 'no',
+    history: 'yes',
+};
+
+const history = {
+    recordEvent: function (event) {
+        if (config.history === 'yes' && history.data.events.push(event) > 100) {
+            history.data.events.splice(0, 1);
+        }
+    },
+    recordSpeed: function (speed) {
+        if (config.history === 'yes' && history.data.speed.push(speed) > 100) {
+            history.data.speed.splice(0, 1);
+        }
+    },
+    data: {
+        events: [],
+        speeds: [],
+    },
 };
 
 const state = {
@@ -47,6 +65,7 @@ const loadConfig = function () {
 
 const onForward = function () {
     print('Forward/Drive engaged\n');
+    history.recordEvent('F');
     exports.set(config.drive === 'yes');
     if (config.speed) {
         config.speedSubscription = PubSub.subscribe('ticker.1', speedHandler);
@@ -56,6 +75,7 @@ const onForward = function () {
 const speedHandler = function () {
     const speed = OvmsMetrics.AsFloat('v.p.speed');
     print('vsp - speed [' + speed + ']\n');
+    history.recordSpeed(speed);
     if (config.drive === 'yes') {
         exports.set(speed < config.speed);
     } else {
@@ -65,11 +85,13 @@ const speedHandler = function () {
 
 const onNeutral = function () {
     print('Neutral engaged\n');
+    history.recordEvent('N');
     turnOff();
 };
 
 const onReverse = function () {
     print('Reverse engaged\n');
+    history.recordEvent('R');
     exports.set(config.reverse === 'yes');
     if (state.speedSubscription) {
         PubSub.unsubscribe(state.speedSubscription);
@@ -79,6 +101,7 @@ const onReverse = function () {
 
 const turnOff = function () {
     print('Turning off\n');
+    history.recordEvent('O');
     exports.set(0);
     if (state.speedSubscription) {
         PubSub.unsubscribe(state.speedSubscription);
@@ -108,6 +131,10 @@ exports.set = function (onoff) {
 
 exports.info = function () {
     JSON.print({ config, state });
+};
+
+exports.history = function () {
+    JSON.print(history.data);
 };
 
 PubSub.subscribe('config.changed', loadConfig);
