@@ -36,19 +36,21 @@ const config = {
 };
 
 const history = {
-    recordEvent: function (event) {
-        if (config.history === 'yes' && history.data.events.push(event) > 100) {
+    data: {
+        events: [],
+        speeds: [],
+    },
+    recordState: function (state) {
+        print('State [' + state + ']\n');
+        if (config.history === 'yes' && history.data.events.push(state) > 100) {
             history.data.events.splice(0, 1);
         }
     },
     recordSpeed: function (speed) {
+        print('Speed [' + speed + ']\n');
         if (config.history === 'yes' && history.data.speed.push(speed) > 100) {
             history.data.speed.splice(0, 1);
         }
-    },
-    data: {
-        events: [],
-        speeds: [],
     },
 };
 
@@ -64,8 +66,7 @@ const loadConfig = function () {
 };
 
 const onForward = function () {
-    print('Forward/Drive engaged\n');
-    history.recordEvent('F');
+    history.recordState('F');
     exports.set(config.drive === 'yes');
     if (config.speed) {
         config.speedSubscription = PubSub.subscribe('ticker.1', speedHandler);
@@ -74,7 +75,6 @@ const onForward = function () {
 
 const speedHandler = function () {
     const speed = OvmsMetrics.AsFloat('v.p.speed');
-    print('vsp - speed [' + speed + ']\n');
     history.recordSpeed(speed);
     if (config.drive === 'yes') {
         exports.set(speed < config.speed);
@@ -84,14 +84,12 @@ const speedHandler = function () {
 };
 
 const onNeutral = function () {
-    print('Neutral engaged\n');
-    history.recordEvent('N');
+    history.recordState('N');
     turnOff();
 };
 
 const onReverse = function () {
-    print('Reverse engaged\n');
-    history.recordEvent('R');
+    history.recordState('R');
     exports.set(config.reverse === 'yes');
     if (state.speedSubscription) {
         PubSub.unsubscribe(state.speedSubscription);
@@ -100,8 +98,7 @@ const onReverse = function () {
 };
 
 const turnOff = function () {
-    print('Turning off\n');
-    history.recordEvent('O');
+    history.recordState('O');
     exports.set(0);
     if (state.speedSubscription) {
         PubSub.unsubscribe(state.speedSubscription);
