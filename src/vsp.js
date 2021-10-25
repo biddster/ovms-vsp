@@ -17,7 +17,7 @@
  * Config:
  *  - vehicle vsp.port        …EGPIO output port number
  *  - vehicle vsp.speed       …turn off above this speed when in drive
- *  - vehicle vsp.forward       …turn on when drive is engaged
+ *  - vehicle vsp.forward     …turn on when forward/drive is engaged
  *  - vehicle vsp.reverse     …turn on when reverse is engaged
  *
  * Usage:
