@@ -17,7 +17,7 @@
  * Config:
  *  - vehicle vsp.port        …EGPIO output port number
  *  - vehicle vsp.speed       …turn off above this speed when in drive
- *  - vehicle vsp.drive       …turn on when drive is engaged
+ *  - vehicle vsp.forward       …turn on when drive is engaged
  *  - vehicle vsp.reverse     …turn on when reverse is engaged
  *
  * Usage:
@@ -30,28 +30,8 @@
 const config = {
     port: '1',
     speed: '0.0',
-    drive: 'no',
-    reverse: 'no',
-    history: 'yes',
-};
-
-const history = {
-    data: {
-        events: [],
-        speeds: [],
-    },
-    recordState: function (state) {
-        print('State [' + state + ']\n');
-        if (config.history === 'yes' && history.data.events.push(state) > 100) {
-            history.data.events.splice(0, 1);
-        }
-    },
-    recordSpeed: function (speed) {
-        print('Speed [' + speed + ']\n');
-        if (config.history === 'yes' && history.data.speed.push(speed) > 100) {
-            history.data.speed.splice(0, 1);
-        }
-    },
+    forward: 'no',
+    reverse: 'yes',
 };
 
 const state = {
@@ -66,17 +46,18 @@ const loadConfig = function () {
 };
 
 const onForward = function () {
-    history.recordState('F');
-    exports.set(config.drive === 'yes');
-    if (config.speed) {
-        config.speedSubscription = PubSub.subscribe('ticker.1', speedHandler);
+    print('Gear [F]\n');
+    exports.set(config.forward === 'yes');
+    if (config.speed && !state.speedSubscription) {
+        print('Subscribing to speed\n');
+        state.speedSubscription = PubSub.subscribe('ticker.1', speedHandler);
     }
 };
 
 const speedHandler = function () {
     const speed = OvmsMetrics.AsFloat('v.p.speed');
-    history.recordSpeed(speed);
-    if (config.drive === 'yes') {
+    print('speed [' + speed + ']\n');
+    if (config.forward === 'yes') {
         exports.set(speed < config.speed);
     } else {
         exports.set(speed > 0.0 && speed <= config.speed);
@@ -84,23 +65,25 @@ const speedHandler = function () {
 };
 
 const onNeutral = function () {
-    history.recordState('N');
+    print('Gear [N]\n');
     turnOff();
 };
 
 const onReverse = function () {
-    history.recordState('R');
+    print('Gear [R]\n');
     exports.set(config.reverse === 'yes');
     if (state.speedSubscription) {
+        print('Unsubscribing from speed\n');
         PubSub.unsubscribe(state.speedSubscription);
         state.speedSubscription = false;
     }
 };
 
 const turnOff = function () {
-    history.recordState('O');
+    print('Off\n');
     exports.set(0);
     if (state.speedSubscription) {
+        print('Unsubscribing from speed\n');
         PubSub.unsubscribe(state.speedSubscription);
         state.speedSubscription = false;
     }
@@ -128,10 +111,6 @@ exports.set = function (onoff) {
 
 exports.info = function () {
     JSON.print({ config, state });
-};
-
-exports.history = function () {
-    JSON.print(history.data);
 };
 
 PubSub.subscribe('config.changed', loadConfig);
