@@ -15,10 +15,10 @@
  *  - script reload
  *
  * Config:
- *  - vehicle vsp.port        …EGPIO output port number
- *  - vehicle vsp.speed       …turn off above this speed when in drive
- *  - vehicle vsp.forward     …turn on when forward/drive is engaged
- *  - vehicle vsp.reverse     …turn on when reverse is engaged
+ *  - config set vehicle vsp.port        …EGPIO output port number
+ *  - config set vehicle vsp.speed       …turn off above this speed when in drive
+ *  - config set vehicle vsp.forward     …turn on when forward/drive is engaged
+ *  - config set vehicle vsp.reverse     …turn on when reverse is engaged
  *
  * Usage:
  *  - script eval vsp.set(1)  …turn vsp on
@@ -56,7 +56,6 @@ const onForward = function () {
 
 const speedHandler = function () {
     const speed = OvmsMetrics.AsFloat('v.p.speed');
-    print('speed [' + speed + ']\n');
     if (config.forward === 'yes') {
         exports.set(speed < config.speed);
     } else {
@@ -91,19 +90,8 @@ const turnOff = function () {
 
 exports.set = function (onoff) {
     const newState = onoff ? 1 : 0;
-    print(
-        'vsp state - requested [' +
-            onoff +
-            '] new [' +
-            newState +
-            '] current [' +
-            state.on +
-            ']\n'
-    );
-
     if (newState !== state.on) {
         OvmsCommand.Exec('egpio output ' + config.port + ' ' + newState);
-        OvmsCommand.Exec('event raise usr.vsp.' + (newState ? 'on' : 'off'));
         state.on = newState;
         print('vsp state - changed to [' + state.on + ']\n');
     }
